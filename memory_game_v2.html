@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Fellowship Memory Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Uncial+Antiqua&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Light scheme: aged parchment */
+    --bg: #e8dbbb;
+    --bg-glow: rgba(255, 244, 210, .9);
+    --panel: #f5ebd0;
+    --panel-edge: #8a6a2f;
+    --text: #2b1d0e;
+    --muted: #6b5632;
+    --gold: #9a6b00;
+    --accent: #5a7a2a;
+    --card-back-a: #3a2a14;
+    --card-back-b: #5a4220;
+    --card-front: #fbf3dc;
+    --shadow: rgba(60, 40, 10, .35);
+    --font-title: 'Uncial Antiqua', 'Cinzel', Georgia, 'Times New Roman', serif;
+    --font-body: 'Cinzel', Georgia, 'Times New Roman', serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14110c;
+      --bg-glow: rgba(70, 50, 20, .55);
+      --panel: #211a10;
+      --panel-edge: #b08a3e;
+      --text: #f0e4c4;
+      --muted: #b9a578;
+      --gold: #e6b84a;
+      --accent: #8fb04a;
+      --card-back-a: #1a120a;
+      --card-back-b: #3a2a14;
+      --card-front: #f3e7c6;
+      --shadow: rgba(0, 0, 0, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14110c;
+    --bg-glow: rgba(70, 50, 20, .55);
+    --panel: #211a10;
+    --panel-edge: #b08a3e;
+    --text: #f0e4c4;
+    --muted: #b9a578;
+    --gold: #e6b84a;
+    --accent: #8fb04a;
+    --card-back-a: #1a120a;
+    --card-back-b: #3a2a14;
+    --card-front: #f3e7c6;
+    --shadow: rgba(0, 0, 0, .6);
+  }
+
+  /* Victory: the whole page shifts from dark Mordor-ish tones to Shire greens and gold */
+  body.won {
+    --bg: #0f2a14;
+    --bg-glow: rgba(255, 215, 90, .45);
+    --panel: #173a1d;
+    --panel-edge: #ffd24a;
+    --text: #fff6d6;
+    --muted: #cfe3a5;
+    --gold: #ffd24a;
+    --accent: #9be35a;
+    --card-back-a: #1d4a24;
+    --card-back-b: #2f7a38;
+    --card-front: #fffbe3;
+  }
+
+  * { box-sizing: border-box; }
+  html { min-height: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 18px 14px 30px;
+    background-color: var(--bg);
+    background-image: radial-gradient(ellipse at 50% 0%, var(--bg-glow), transparent 65%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--font-body);
+    display: flex;
+    justify-content: center;
+    transition: background-color .9s ease, color .6s ease;
+  }
+  body.won::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 40%, rgba(255, 215, 90, .25), transparent 60%);
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  .game { width: 100%; max-width: 520px; position: relative; }
+
+  h1 {
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(24px, 7vw, 36px);
+    text-align: center;
+    margin: 6px 0 2px;
+    color: var(--gold);
+    text-shadow: 0 2px 0 var(--shadow), 0 0 18px var(--bg-glow);
+    letter-spacing: .02em;
+  }
+  .subtitle {
+    text-align: center;
+    margin: 0 0 16px;
+    font-size: 12px;
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 2px solid var(--panel-edge);
+    border-radius: 14px;
+    box-shadow: 0 8px 22px var(--shadow), inset 0 0 0 4px var(--panel), inset 0 0 0 5px color-mix(in srgb, var(--panel-edge) 50%, transparent);
+    transition: background-color .9s ease, border-color .9s ease;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 12px 8px;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .stat-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    display: block;
+    font-weight: 700;
+    font-size: clamp(14px, 4.4vw, 20px);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stat-value.gold { color: var(--gold); }
+  .bump { animation: bump .35s ease; }
+
+  .board-wrap { padding: 12px; }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(6px, 2vw, 12px);
+  }
+
+  .card {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    perspective: 800px;
+    -webkit-tap-highlight-color: transparent;
+    animation: dealIn .5s ease backwards;
+  }
+  .card-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform .65s cubic-bezier(.3, .8, .3, 1);
+  }
+  .card:not(.flipped):not(.matched):hover .card-inner { transform: translateY(-3px) rotateZ(-1deg); }
+  .card.flipped .card-inner,
+  .card.matched .card-inner { transform: rotateY(180deg); }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    border-radius: 9px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px var(--shadow);
+  }
+
+  .back {
+    background:
+      repeating-linear-gradient(45deg, transparent 0 6px, rgba(255, 215, 120, .05) 6px 7px),
+      linear-gradient(145deg, var(--card-back-b), var(--card-back-a));
+    border: 2px solid var(--panel-edge);
+  }
+  /* The One Ring on the back of every card */
+  .ring {
+    width: 52%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: clamp(4px, 1.4vw, 7px) solid var(--gold);
+    box-shadow: 0 0 10px var(--gold), inset 0 0 6px rgba(0, 0, 0, .6);
+    position: relative;
+  }
+  .ring::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    border-radius: 50%;
+    border: 1px dashed color-mix(in srgb, var(--gold) 60%, transparent);
+  }
+
+  .front {
+    transform: rotateY(180deg);
+    background: linear-gradient(160deg, var(--card-front), color-mix(in srgb, var(--card-front) 82%, #b08a3e));
+    border: 2px solid var(--panel-edge);
+    color: #2b1d0e;
+    gap: 4px;
+  }
+  .char-icon { font-size: clamp(30px, 10vw, 50px); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)); }
+  .char-name {
+    font-size: clamp(8px, 2.5vw, 12px);
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .card.matched .front {
+    border-color: var(--gold);
+    box-shadow: 0 0 14px var(--gold), 0 3px 8px var(--shadow);
+  }
+  .card.matched { animation: matchPop .5s ease .45s; }
+  .card.wrong .card-inner { animation: shake .4s ease .5s; }
+
+  .actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+  .btn {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--panel-edge) 35%, var(--panel)), var(--panel));
+    border: 2px solid var(--panel-edge);
+    border-radius: 999px;
+    padding: 11px 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px var(--shadow);
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 4px var(--shadow); }
+  .btn.primary { background: linear-gradient(180deg, var(--gold), color-mix(in srgb, var(--gold) 65%, #000)); color: #1b1203; }
+  .btn:focus-visible, .card:focus-visible, .name-input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+  /* Overlays: name screen + win display */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(8, 6, 3, .72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .5s ease;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    width: 100%;
+    max-width: 400px;
+    padding: 28px 22px 24px;
+    text-align: center;
+    transform: scale(.85) translateY(20px);
+    transition: transform .55s cubic-bezier(.2, 1.1, .3, 1);
+  }
+  .overlay.show .modal { transform: scale(1) translateY(0); }
+  .modal h2 {
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(22px, 6.5vw, 30px);
+    margin: 0 0 8px;
+    color: var(--gold);
+    text-shadow: 0 0 16px var(--bg-glow);
+  }
+  .modal p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .name-input {
+    width: 100%;
+    font-family: var(--font-body);
+    font-size: 18px;
+    text-align: center;
+    padding: 12px 14px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--panel) 70%, #000);
+    border: 2px solid var(--panel-edge);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .name-input::placeholder { color: var(--muted); opacity: .7; }
+  .error { min-height: 18px; margin: 0 0 10px !important; font-size: 12px !important; color: #e0674a !important; }
+
+  .win-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 4px 0 20px;
+  }
+  .win-stat {
+    padding: 12px 4px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel) 75%, #000);
+  }
+  .win-stat b { display: block; font-size: 22px; color: var(--gold); margin-top: 4px; }
+  .win-stat span { font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); }
+  .win-ring {
+    width: 64px; height: 64px; margin: 0 auto 12px;
+    border-radius: 50%;
+    border: 8px solid var(--gold);
+    box-shadow: 0 0 22px var(--gold), inset 0 0 8px rgba(0, 0, 0, .5);
+    animation: ringSpin 6s linear infinite;
+  }
+
+  @keyframes dealIn { from { opacity: 0; transform: translateY(14px) scale(.9); } to { opacity: 1; transform: none; } }
+  @keyframes bump { 50% { transform: scale(1.3); color: var(--gold); } }
+  @keyframes matchPop { 40% { transform: scale(1.08); } }
+  @keyframes shake { 20% { transform: rotateY(180deg) translateX(-4px); } 60% { transform: rotateY(180deg) translateX(4px); } }
+  @keyframes glowPulse { 50% { opacity: .5; } }
+  @keyframes ringSpin { to { transform: rotateY(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+    .card-inner, .modal, .overlay { transition-duration: .01s; }
+  }
+</style>
+</head>
+<body>
+  <main class="game">
+    <h1>The Fellowship</h1>
+    <p class="subtitle">A Middle-earth Memory Game</p>
+
+    <section class="panel stats" aria-label="Game stats">
+      <div><span class="stat-label">Player</span><span class="stat-value" id="playerLabel">&mdash;</span></div>
+      <div><span class="stat-label">Moves</span><span class="stat-value" id="moves">0</span></div>
+      <div><span class="stat-label">Score</span><span class="stat-value gold" id="score">0</span></div>
+      <div><span class="stat-label">Time</span><span class="stat-value" id="time">00:00</span></div>
+    </section>
+
+    <section class="panel board-wrap">
+      <div class="board" id="board"></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary" id="restart" type="button">Restart</button>
+      <button class="btn" id="reset" type="button">Reset</button>
+    </div>
+  </main>
+
+  <!-- Name screen -->
+  <div class="overlay show" id="nameOverlay" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
+    <div class="panel modal">
+      <h2 id="nameTitle">Welcome, Traveler</h2>
+      <p>Before your quest begins, tell us your name.</p>
+      <input class="name-input" id="nameInput" type="text" maxlength="16" placeholder="Your name" autocomplete="off">
+      <p class="error" id="nameError"></p>
+      <button class="btn primary" id="startBtn" type="button">Begin the Quest</button>
+    </div>
+  </div>
+
+  <!-- Win display -->
+  <div class="overlay" id="winOverlay" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="panel modal">
+      <div class="win-ring"></div>
+      <h2 id="winTitle">You did it!</h2>
+      <p id="winText"></p>
+      <div class="win-stats">
+        <div class="win-stat"><span>Time</span><b id="winTime">00:00</b></div>
+        <div class="win-stat"><span>Moves</span><b id="winMoves">0</b></div>
+        <div class="win-stat"><span>Score</span><b id="winScore">0</b></div>
+      </div>
+      <button class="btn primary" id="playAgain" type="button">Play Again</button>
+    </div>
+  </div>
+
+<script>
+  const characters = [
+    { name: 'Gandalf',  icon: '🧙' },
+    { name: 'Frodo',    icon: '💍' },
+    { name: 'Aragorn',  icon: '👑' },
+    { name: 'Legolas',  icon: '🏹' },
+    { name: 'Gimli',    icon: '🪓' },
+    { name: 'Gollum',   icon: '🐟' },
+    { name: 'Sauron',   icon: '👁️' },
+    { name: 'Samwise',  icon: '🍳' }
+  ];
+
+  const MATCH_POINTS = 100;
+  const MISS_PENALTY = 10;
+
+  const board = document.getElementById('board');
+  const movesEl = document.getElementById('moves');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const playerLabel = document.getElementById('playerLabel');
+  const nameOverlay = document.getElementById('nameOverlay');
+  const winOverlay = document.getElementById('winOverlay');
+  const nameInput = document.getElementById('nameInput');
+  const nameError = document.getElementById('nameError');
+
+  let playerName = '';
+  let first = null;
+  let second = null;
+  let lock = false;
+  let playing = false;
+  let moves = 0;
+  let score = 0;
+  let matches = 0;
+  let startTime = 0;
+  let timerId = null;
+  let elapsed = 0;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function formatTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return m + ':' + s;
+  }
+
+  function bump(el) {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
+  function updateStats() {
+    movesEl.textContent = moves;
+    scoreEl.textContent = score;
+    timeEl.textContent = formatTime(elapsed);
+    playerLabel.textContent = playerName || '\u2014';
+  }
+
+  function startTimer() {
+    startTime = Date.now();
+    timerId = setInterval(() => {
+      elapsed = Math.floor((Date.now() - startTime) / 1000);
+      timeEl.textContent = formatTime(elapsed);
+    }, 250);
+  }
+
+  function stopTimer() {
+    clearInterval(timerId);
+    timerId = null;
+  }
+
+  function buildBoard(withCards) {
+    board.innerHTML = '';
+    const deck = withCards ? shuffle([...characters, ...characters]) : new Array(16).fill(null);
+    deck.forEach((ch, i) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'card';
+      card.style.animationDelay = (i * 30) + 'ms';
+      if (ch) {
+        card.dataset.name = ch.name;
+        card.setAttribute('aria-label', 'Hidden card');
+      }
+      card.innerHTML =
+        '<div class="card-inner">' +
+          '<div class="face back"><div class="ring"></div></div>' +
+          '<div class="face front">' +
+            '<span class="char-icon">' + (ch ? ch.icon : '') + '</span>' +
+            '<span class="char-name">' + (ch ? ch.name : '') + '</span>' +
+          '</div>' +
+        '</div>';
+      if (ch) card.addEventListener('click', () => flip(card));
+      board.appendChild(card);
+    });
+  }
+
+  function startGame() {
+    stopTimer();
+    document.body.classList.remove('won');
+    winOverlay.classList.remove('show');
+    first = null;
+    second = null;
+    lock = false;
+    moves = 0;
+    score = 0;
+    matches = 0;
+    elapsed = 0;
+    playing = true;
+    updateStats();
+    buildBoard(true);
+  }
+
+  function flip(card) {
+    if (!playing || lock) return;
+    if (card === first) return;
+    if (card.classList.contains('matched')) return;
+
+    if (!timerId && moves === 0 && !first) startTimer();
+
+    card.classList.add('flipped');
+
+    if (!first) {
+      first = card;
+      return;
+    }
+
+    second = card;
+    moves++;
+    bump(movesEl);
+    lock = true;
+
+    if (first.dataset.name === second.dataset.name) {
+      first.classList.add('matched');
+      second.classList.add('matched');
+      score += MATCH_POINTS;
+      bump(scoreEl);
+      matches++;
+      updateStats();
+      resetTurn();
+      if (matches === characters.length) win();
+    } else {
+      score = Math.max(0, score - MISS_PENALTY);
+      updateStats();
+      first.classList.add('wrong');
+      second.classList.add('wrong');
+      const a = first, b = second;
+      setTimeout(() => {
+        a.classList.remove('flipped', 'wrong');
+        b.classList.remove('flipped', 'wrong');
+        resetTurn();
+      }, 1100);
+    }
+  }
+
+  function resetTurn() {
+    first = null;
+    second = null;
+    lock = false;
+  }
+
+  function win() {
+    stopTimer();
+    elapsed = Math.floor((Date.now() - startTime) / 1000);
+    playing = false;
+    updateStats();
+    setTimeout(() => {
+      document.body.classList.add('won');
+      document.getElementById('winText').textContent =
+        'Well done, ' + playerName + '! The Fellowship is united and the Ring is safe.';
+      document.getElementById('winTime').textContent = formatTime(elapsed);
+      document.getElementById('winMoves').textContent = moves;
+      document.getElementById('winScore').textContent = score;
+      winOverlay.classList.add('show');
+    }, 900);
+  }
+
+  function confirmName() {
+    const value = nameInput.value.trim();
+    if (!value) {
+      nameError.textContent = 'Every hero needs a name.';
+      nameInput.focus();
+      return;
+    }
+    playerName = value;
+    nameError.textContent = '';
+    nameOverlay.classList.remove('show');
+    startGame();
+  }
+
+  function resetEverything() {
+    stopTimer();
+    document.body.classList.remove('won');
+    winOverlay.classList.remove('show');
+    playerName = '';
+    playing = false;
+    first = null;
+    second = null;
+    lock = false;
+    moves = 0;
+    score = 0;
+    matches = 0;
+    elapsed = 0;
+    nameInput.value = '';
+    nameError.textContent = '';
+    updateStats();
+    buildBoard(false);
+    nameOverlay.classList.add('show');
+    setTimeout(() => nameInput.focus(), 100);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', confirmName);
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmName(); });
+  document.getElementById('restart').addEventListener('click', () => { if (playerName) startGame(); });
+  document.getElementById('reset').addEventListener('click', resetEverything);
+  document.getElementById('playAgain').addEventListener('click', startGame);
+
+  buildBoard(false);
+  updateStats();
+  setTimeout(() => nameInput.focus(), 100);
+</script>
+</body>
+</html>
