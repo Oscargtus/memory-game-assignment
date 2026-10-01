@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arcade Memory Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0620;
+    --cabinet: #1a1038;
+    --cabinet-edge: #2c1a5e;
+    --screen: #070314;
+    --accent: #00f0ff;
+    --accent-2: #ff2bd6;
+    --card-back: #2a1a66;
+    --card-front: #fff7d6;
+    --text: #f2ecff;
+    --font: 'Press Start 2P', 'Courier New', monospace;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Win state: the whole station changes colors */
+  body.won {
+    --bg: #04200f;
+    --cabinet: #0f3a1d;
+    --cabinet-edge: #1f7a3a;
+    --screen: #03160a;
+    --accent: #ffe600;
+    --accent-2: #39ff14;
+    --card-back: #1f7a3a;
+    --card-front: #fffbe0;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    background-image:
+      linear-gradient(var(--cabinet-edge) 1px, transparent 1px),
+      linear-gradient(90deg, var(--cabinet-edge) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    justify-content: center;
+    transition: background-color .6s;
+  }
+
+  .cabinet {
+    width: 100%;
+    max-width: 460px;
+    background: var(--cabinet);
+    border: 4px solid var(--cabinet-edge);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 0 0 4px var(--bg), 0 0 28px var(--accent-2), inset 0 0 20px rgba(0,0,0,.5);
+    transition: background-color .6s, border-color .6s, box-shadow .6s;
+  }
+
+  .marquee {
+    text-align: center;
+    font-size: clamp(14px, 4.4vw, 20px);
+    line-height: 1.4;
+    color: var(--accent);
+    text-shadow: 0 0 8px var(--accent), 0 0 18px var(--accent-2);
+    padding: 12px 8px;
+    margin-bottom: 14px;
+    border: 3px solid var(--accent-2);
+    border-radius: 10px;
+    background: var(--screen);
+  }
+
+  .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+  .screen {
+    background: var(--screen);
+    border: 4px solid #000;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: inset 0 0 24px rgba(0,240,255,.15);
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .card {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    perspective: 600px;
+  }
+  .card-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform .45s;
+  }
+  .card.flipped .card-inner,
+  .card.matched .card-inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .back {
+    background: var(--card-back);
+    border: 3px solid var(--accent-2);
+    color: var(--accent);
+    font-size: clamp(16px, 5vw, 24px);
+    box-shadow: inset 0 0 12px rgba(0,0,0,.5);
+  }
+  .front {
+    background: var(--card-front);
+    border: 3px solid var(--accent);
+    font-size: clamp(28px, 9vw, 44px);
+    transform: rotateY(180deg);
+  }
+  .card.matched .front {
+    box-shadow: 0 0 14px var(--accent), inset 0 0 10px var(--accent-2);
+  }
+
+  .message {
+    min-height: 56px;
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: clamp(16px, 5.5vw, 26px);
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--accent), 0 0 22px var(--accent-2);
+    visibility: hidden;
+  }
+  body.won .message { visibility: visible; animation: pop .6s ease-out, hue 3s linear infinite .6s; }
+
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes hue { to { filter: hue-rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-inner { transition: none; }
+    body.won .message { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="cabinet">
+    <div class="marquee">ARCADE MEMORY STATION</div>
+
+    <div class="screen">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="message" id="message" role="status" aria-live="polite">You did it!</div>
+  </main>
+
+<script>
+  const icons = ['👾', '🕹️', '🚀', '👻', '🍒', '⭐', '💎', '🎮'];
+  const board = document.getElementById('board');
+
+  let first = null;
+  let second = null;
+  let lock = false;
+  let matches = 0;
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function startGame() {
+    board.innerHTML = '';
+    document.body.classList.remove('won');
+    first = null;
+    second = null;
+    lock = false;
+    matches = 0;
+
+    shuffle([...icons, ...icons]).forEach(icon => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'card';
+      card.dataset.icon = icon;
+      card.setAttribute('aria-label', 'Hidden card');
+      card.innerHTML =
+        '<div class="card-inner">' +
+          '<div class="face back">?</div>' +
+          '<div class="face front">' + icon + '</div>' +
+        '</div>';
+      card.addEventListener('click', () => flip(card));
+      board.appendChild(card);
+    });
+  }
+
+  function flip(card) {
+    if (lock) return;
+    if (card === first) return;
+    if (card.classList.contains('matched')) return;
+
+    card.classList.add('flipped');
+
+    if (!first) {
+      first = card;
+      return;
+    }
+
+    second = card;
+    lock = true;
+
+    if (first.dataset.icon === second.dataset.icon) {
+      // Match: cards stay flipped
+      first.classList.add('matched');
+      second.classList.add('matched');
+      matches++;
+      resetTurn();
+      if (matches === icons.length) {
+        setTimeout(() => document.body.classList.add('won'), 500);
+      }
+    } else {
+      // No match: flip back
+      setTimeout(() => {
+        first.classList.remove('flipped');
+        second.classList.remove('flipped');
+        resetTurn();
+      }, 1000);
+    }
+  }
+
+  function resetTurn() {
+    first = null;
+    second = null;
+    lock = false;
+  }
+
+  startGame();
+</script>
+</body>
+</html>
